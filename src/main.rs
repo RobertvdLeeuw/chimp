@@ -2,8 +2,13 @@ use rand::RngExt;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-// use std::thread::sleep;
-use std::time::{Duration, SystemTime};
+use std::thread::sleep;
+use std::time::Duration;
+
+// use pixels::{Pixels, SurfaceTexture};
+// use winit::event::{Event, WindowEvent};
+// use winit::event_loop::{ControlFlow, EventLoop};
+// use winit::window::WindowBuilder;
 
 // TODO:
 // Collect monkey pics
@@ -31,20 +36,22 @@ fn pick_monker() -> PathBuf {
 
     let index = rand::rng().random_range(0..files.len());
 
+    // TODO: Store last picked, make sure not twice in a row.
+
     files[index].clone()
 }
 
 fn present() {
     let monker_pic = pick_monker();
 
-    // Make window
+    println!("{}\n", monker_pic.display())
 }
 
 fn update_time(sec_left: &mut u32, wait_s: u64) {
     *sec_left -= wait_s as u32;
 
     // Save time to file
-    match fs::write("time_left.txt", sec_left.to_string()) {
+    match fs::write("./data/time_left.txt", sec_left.to_string()) {
         Ok(_) => {}
         Err(e) => panic!("Error saving timing file: {error}", error = e),
     };
@@ -53,19 +60,21 @@ fn update_time(sec_left: &mut u32, wait_s: u64) {
 fn pick_time(start: bool) -> u32 {
     // picking secs + countdown instead of random future time prevents planned time when PC off.
     // Now on PC reboot, it can just continue the countdown.
-    if start {
-        return rand::rng().random_range(8 * 3600..16 * 3600);
+    if !start {
+        // return rand::rng().random_range(8 * 3600..16 * 3600);
+        // return rand::rng().random_range(4..16);
+        return 3;
     }
 
     // NOTE: How can I avoid such nesting? I miss guard clauses.
-    match fs::read_to_string("time_left.txt") {
+    match fs::read_to_string("./data/time_left.txt") {
         Ok(val) => {
             match val.parse::<u32>() {
                 Ok(num) => return num,
                 Err(_) => panic!("Timing file value not a number: {}", val),
             };
         }
-        Err(e) => panic!("Error reading timing file: {}", e),
+        Err(_) => pick_time(false), // Just get new time.
     }
 }
 
@@ -74,15 +83,13 @@ fn main() {
 
     let wait_s = 1;
 
-    print!("{}", pick_monker().display());
+    loop {
+        if sec_left == 0 {
+            present();
+            sec_left = pick_time(false)
+        }
 
-    // loop {
-    //     sleep(Duration::new(wait_s, 0));
-    //     update_time(&mut sec_left, wait_s);
-    //
-    //     if sec_left == 0 {
-    //         present();
-    //         sec_left = pick_time(false)
-    //     }
-    // }
+        update_time(&mut sec_left, wait_s);
+        sleep(Duration::new(wait_s, 0));
+    }
 }
