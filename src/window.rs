@@ -5,11 +5,19 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::platform::wayland::WindowAttributesExtWayland;
 use winit::window::{Window, WindowAttributes, WindowId};
 
+use image::io::Reader as ImageReader;
+use image::{ImageResult, image_dimensions};
+
 use std::path::{Path, PathBuf};
 
 struct App {
     window: Option<&'static Window>,
     pixels: Option<Pixels<'static>>,
+
+    width: u32,
+    height: u32,
+
+    img_path: PathBuf,
 }
 
 impl ApplicationHandler for App {
@@ -24,18 +32,13 @@ impl ApplicationHandler for App {
                 )
                 .unwrap(),
         ));
-        println!("1");
 
         let size = window.inner_size();
-        println!("2");
         let surface = SurfaceTexture::new(size.width, size.height, window);
-        println!("3");
-        let pixels = Pixels::new(800, 600, surface).unwrap();
-        println!("4");
+        let pixels = Pixels::new(self.width, self.height, surface).unwrap();
 
         self.window = Some(window);
         self.pixels = Some(pixels);
-        println!("5");
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -45,7 +48,16 @@ impl ApplicationHandler for App {
                 // Render here
                 println!("render");
                 let frame = self.pixels.as_mut().unwrap().frame_mut();
-                frame.fill(0);
+
+                let img = ImageReader::open(self.img_path.as_os_str())
+                    .unwrap()
+                    .decode()
+                    .unwrap();
+
+                let rgba = img.to_rgba8();
+                let raw_pixels: &[u8] = rgba.as_raw();
+
+                frame.copy_from_slice(raw_pixels);
                 self.pixels.as_mut().unwrap().render().unwrap();
             }
             _ => {}
@@ -54,11 +66,20 @@ impl ApplicationHandler for App {
 }
 
 pub fn present(img_filepath: PathBuf) {
+    let (width, height) = match image_dimensions(img_filepath.as_os_str()) {
+        ImageResult::Ok((w, h)) => (w, h),
+        ImageResult::Err(e) => panic!("Error getting file dimensions: {}", e),
+    };
+
     let event_loop = EventLoop::new().unwrap();
     let mut app = App {
         window: None,
         pixels: None,
-        // start_time: None,
+
+        width,
+        height,
+
+        img_path: img_filepath,
     };
 
     println!("Starting app");
