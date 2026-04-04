@@ -1,5 +1,6 @@
 use pixels::{Pixels, SurfaceTexture};
 use winit::application::ApplicationHandler;
+use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::platform::wayland::WindowAttributesExtWayland;
