@@ -2,13 +2,11 @@ use rand::RngExt;
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
 
-// use pixels::{Pixels, SurfaceTexture};
-// use winit::event::{Event, WindowEvent};
-// use winit::event_loop::{ControlFlow, EventLoop};
-// use winit::window::WindowBuilder;
+mod window;
 
 // TODO:
 // Collect monkey pics
@@ -41,12 +39,6 @@ fn pick_monker() -> PathBuf {
     files[index].clone()
 }
 
-fn present() {
-    let monker_pic = pick_monker();
-
-    println!("{}\n", monker_pic.display())
-}
-
 fn update_time(sec_left: &mut u32, wait_s: u64) {
     *sec_left -= wait_s as u32;
 
@@ -62,7 +54,6 @@ fn pick_time(start: bool) -> u32 {
     // Now on PC reboot, it can just continue the countdown.
     if !start {
         // return rand::rng().random_range(8 * 3600..16 * 3600);
-        // return rand::rng().random_range(4..16);
         return 3;
     }
 
@@ -83,9 +74,12 @@ fn main() {
 
     let wait_s = 1;
 
+    window::present(pick_monker());
+
+    exit(0);
     loop {
         if sec_left == 0 {
-            present();
+            window::present(pick_monker());
             sec_left = pick_time(false)
         }
 

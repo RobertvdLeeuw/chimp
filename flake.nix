@@ -23,10 +23,40 @@
         packages.default = craneLib.buildPackage {
           src = craneLib.cleanCargoSource ./.;
 
-          # Add extra inputs here or any other derivation settings
-          # doCheck = true;
-          # buildInputs = [];
-          # nativeBuildInputs = [];
+          buildInputs = with pkgs; [
+            wayland
+            libxkbcommon
+            xkeyboard-config
+          ];
+
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+          ];
+
+          # For GPU rendering (pixels needs this)
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            pkgs.libGL
+            pkgs.libxkbcommon
+            pkgs.wayland
+          ];
+        };
+
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            wayland
+            libxkbcommon
+            xkeyboard-config # Add this
+            libGL
+          ];
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+          ];
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            pkgs.libGL
+            pkgs.libxkbcommon
+            pkgs.wayland
+          ];
+          XKB_CONFIG_ROOT = "${pkgs.xkeyboard-config}/share/X11/xkb";
         };
       }
     );
