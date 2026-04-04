@@ -2,6 +2,7 @@ use pixels::{Pixels, SurfaceTexture};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::platform::wayland::WindowAttributesExtWayland;
 use winit::window::{Window, WindowAttributes, WindowId};
 
 use std::path::{Path, PathBuf};
@@ -16,7 +17,11 @@ impl ApplicationHandler for App {
         // Leak the Window so it has 'static lifetime
         let window: &'static Window = Box::leak(Box::new(
             event_loop
-                .create_window(WindowAttributes::default())
+                .create_window(
+                    WindowAttributes::default()
+                        .with_title("Chimp")
+                        .with_name("chimp", "chimp"),
+                )
                 .unwrap(),
         ));
         println!("1");
@@ -39,6 +44,9 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 // Render here
                 println!("render");
+                let frame = self.pixels.as_mut().unwrap().frame_mut();
+                frame.fill(0);
+                self.pixels.as_mut().unwrap().render().unwrap();
             }
             _ => {}
         }
