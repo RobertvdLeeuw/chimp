@@ -7,4 +7,5 @@ edition = "2024"
 image = "0.25.10"
 pixels = "0.16.0"
 rand = { version = "0.10.0", features = ["std_rng"] }
+swayipc = "4.0.0"
 winit = "0.30.13"

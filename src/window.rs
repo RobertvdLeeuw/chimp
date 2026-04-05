@@ -6,8 +6,10 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::platform::wayland::WindowAttributesExtWayland;
 use winit::window::{Window, WindowAttributes, WindowId};
 
-use image::io::Reader as ImageReader;
-use image::{ImageResult, image_dimensions};
+use image::imageops::Lanczos3;
+use image::{DynamicImage, GenericImageView, ImageReader, ImageResult};
+
+use swayipc::Connection;
 
 use std::path::{Path, PathBuf};
 
@@ -18,7 +20,7 @@ struct App {
     width: u32,
     height: u32,
 
-    img_path: PathBuf,
+    img_pixels: Vec<u8>,
 }
 
 impl ApplicationHandler for App {
@@ -29,13 +31,14 @@ impl ApplicationHandler for App {
                 .create_window(
                     WindowAttributes::default()
                         .with_title("Chimp")
+                        .with_inner_size(LogicalSize::new(self.width, self.height))
                         .with_name("chimp", "chimp"),
                 )
                 .unwrap(),
         ));
 
-        let size = window.inner_size();
-        let surface = SurfaceTexture::new(size.width, size.height, window);
+        // let size = window.inner_size();
+        let surface = SurfaceTexture::new(self.width, self.height, window);
         let pixels = Pixels::new(self.width, self.height, surface).unwrap();
 
         self.window = Some(window);
@@ -46,19 +49,9 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
-                // Render here
-                println!("render");
                 let frame = self.pixels.as_mut().unwrap().frame_mut();
 
-                let img = ImageReader::open(self.img_path.as_os_str())
-                    .unwrap()
-                    .decode()
-                    .unwrap();
-
-                let rgba = img.to_rgba8();
-                let raw_pixels: &[u8] = rgba.as_raw();
-
-                frame.copy_from_slice(raw_pixels);
+                frame.copy_from_slice(&self.img_pixels);
                 self.pixels.as_mut().unwrap().render().unwrap();
             }
             _ => {}
@@ -66,11 +59,40 @@ impl ApplicationHandler for App {
     }
 }
 
+const DISPLAY_RATIO: f32 = 0.7;
+fn calc_display_size() -> (u32, u32) {
+    let mut conn = Connection::new().expect("Failed to get sway connection.");
+    let monitors = conn.get_outputs().unwrap();
+
+    let (w, h) = monitors
+        .iter()
+        .filter(|mon| mon.focused)
+        .map(|mon| mon.current_mode.unwrap())
+        .map(|mode| (mode.width as f32, mode.height as f32))
+        .collect::<Vec<(f32, f32)>>()[0];
+
+    ((w * DISPLAY_RATIO) as u32, (h * DISPLAY_RATIO) as u32)
+}
+
+fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
+    let img = ImageReader::open(img_filepath).unwrap().decode().unwrap();
+
+    let (max_w, max_h) = calc_display_size();
+
+    let resized = DynamicImage::resize(&img, max_w, max_h, Lanczos3);
+
+    let img_buffer = resized.to_rgba8();
+
+    let (width, height) = resized.dimensions();
+
+    // let (tmp_w, tmp_h) = img.dimensions();
+    // println!("Ori: {}x{}, resize: {}x{}", tmp_w, tmp_h, width, height);
+
+    (img_buffer.as_raw().to_vec(), width, height)
+}
+
 pub fn present(img_filepath: PathBuf) {
-    let (width, height) = match image_dimensions(img_filepath.as_os_str()) {
-        ImageResult::Ok((w, h)) => (w, h),
-        ImageResult::Err(e) => panic!("Error getting file dimensions: {}", e),
-    };
+    let (pixels, width, height) = get_normalized_image(img_filepath);
 
     let event_loop = EventLoop::new().unwrap();
     let mut app = App {
@@ -80,7 +102,7 @@ pub fn present(img_filepath: PathBuf) {
         width,
         height,
 
-        img_path: img_filepath,
+        img_pixels: pixels,
     };
 
     println!("Starting app");
