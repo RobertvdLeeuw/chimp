@@ -16,9 +16,10 @@ use rodio::{Device, DeviceSinkBuilder, MixerDeviceSink, Player, source::Source};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 struct App {
-    window: Option<&'static Window>,
+    window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
 
     _sink: MixerDeviceSink,
@@ -34,8 +35,7 @@ struct App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        // Leak the Window so it has 'static lifetime
-        let window: &'static Window = Box::leak(Box::new(
+        let window = Arc::new(
             event_loop
                 .create_window(
                     WindowAttributes::default()
@@ -44,10 +44,10 @@ impl ApplicationHandler for App {
                         .with_name("chimp", "chimp"),
                 )
                 .unwrap(),
-        ));
+        );
 
         // let size = window.inner_size();
-        let surface = SurfaceTexture::new(self.width, self.height, window);
+        let surface = SurfaceTexture::new(self.width, self.height, window.clone());
         let pixels = Pixels::new(self.width, self.height, surface).unwrap();
 
         self.window = Some(window);
@@ -56,23 +56,25 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+                return;
+            }
             WindowEvent::RedrawRequested => {
                 let frame = self.pixels.as_mut().unwrap().frame_mut();
 
                 // Drum roll climax
-                if self.start_time.elapsed() < Duration::from_millis(4_385) {
+                if self.start_time.elapsed() < Duration::from_millis(4_390) {
                     frame.fill(0);
                 } else {
                     frame.copy_from_slice(&self.img_pixels);
                 }
 
                 self.pixels.as_mut().unwrap().render().unwrap();
+                self.window.as_ref().unwrap().request_redraw();
             }
             _ => {}
         }
-
-        self.window.unwrap().request_redraw();
     }
 }
 

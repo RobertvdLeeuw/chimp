@@ -68,10 +68,8 @@ fn pick_monker(state: &mut State) -> PathBuf {
         if !state.monkers_last_picked.contains(&picked) {
             state.push_monkey(picked.clone());
 
-            println!("New: {}", picked.display());
             return picked;
         }
-        println!("Recent: {}", picked.display())
     }
 }
 
@@ -88,7 +86,7 @@ fn main() {
 
     let wait_interval_s = 1;
 
-    // window::present(pick_monker());
+    // window::present(pick_monker(&mut state));
     // exit(0);
 
     loop {
