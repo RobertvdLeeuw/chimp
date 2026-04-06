@@ -85,9 +85,6 @@ fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
 
     let (width, height) = resized.dimensions();
 
-    // let (tmp_w, tmp_h) = img.dimensions();
-    // println!("Ori: {}x{}, resize: {}x{}", tmp_w, tmp_h, width, height);
-
     (img_buffer.as_raw().to_vec(), width, height)
 }
 
