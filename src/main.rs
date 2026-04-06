@@ -2,17 +2,18 @@ use rand::RngExt;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::thread::sleep;
+use std::thread;
 use std::time::Duration;
 
+use winit::event_loop::EventLoop;
+
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 mod window;
 
 #[derive(Serialize, Deserialize)]
 struct State {
-    secs_left: u32,
+    time_left_s: u32,
     monkers_last_picked: Vec<PathBuf>,
 }
 
@@ -23,7 +24,7 @@ impl State {
 
     fn new() -> Self {
         State {
-            secs_left: pick_time(),
+            time_left_s: pick_time(),
             monkers_last_picked: Vec::new(),
         }
     }
@@ -82,23 +83,28 @@ fn pick_time() -> u32 {
 fn main() {
     let mut state = State::load_or_default();
 
-    let wait_interval_s = 1;
+    // let (tx, rx) = mpsc::channel();
+    let event_loop = EventLoop::with_user_event().build().unwrap();
+    let proxy = event_loop.create_proxy();
 
-    // window::present(pick_monker(&mut state));
-    // exit(0);
+    // Countdown thread - manages state and timing
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(1));
 
-    loop {
-        if state.secs_left == 0 {
-            window::present(pick_monker(&mut state));
-            println!("Present: {}", pick_monker(&mut state).display());
-
-            state.secs_left = pick_time();
+            state.time_left_s -= 1;
             state.save();
+
+            if state.time_left_s == 0 {
+                let monker_path = pick_monker(&mut state);
+                proxy.send_event(monker_path).unwrap();
+
+                state.time_left_s = pick_time();
+                state.save();
+            }
         }
+    });
 
-        state.secs_left -= wait_interval_s as u32;
-        state.save();
-
-        sleep(Duration::new(wait_interval_s, 0));
-    }
+    let mut app = window::App::new();
+    event_loop.run_app(&mut app).unwrap();
 }

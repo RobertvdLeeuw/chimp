@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::ActiveEventLoop;
 use winit::platform::wayland::WindowAttributesExtWayland;
 use winit::window::{Window, WindowAttributes, WindowId};
 
@@ -18,55 +18,92 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-struct App {
+pub struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
 
-    _sink: MixerDeviceSink,
-    _player: Player,
-
-    start_time: Instant,
+    _sink: Option<MixerDeviceSink>,
+    _player: Option<Player>,
+    start_time: Option<Instant>,
 
     width: u32,
     height: u32,
-
     img_pixels: Vec<u8>,
 }
 
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+impl App {
+    pub fn new() -> Self {
+        App {
+            window: None,
+            pixels: None,
+            _sink: None,
+            _player: None,
+            start_time: None,
+            width: 0,
+            height: 0,
+            img_pixels: Vec::new(),
+        }
+    }
+}
+
+impl ApplicationHandler<PathBuf> for App {
+    // PathBuf is user event type
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, monker_path: PathBuf) {
+        // Create window for new monker display
+        let (pixels, width, height) = get_normalized_image(monker_path.clone());
+
+        let mut sink = DeviceSinkBuilder::open_default_sink().unwrap();
+        sink.log_on_drop(false);
+        let player = rodio::play(
+            sink.mixer(),
+            BufReader::new(File::open("data/Drumroll.mp3").unwrap()),
+        )
+        .unwrap();
+
         let window = Arc::new(
             event_loop
                 .create_window(
                     WindowAttributes::default()
                         .with_title("Chimp")
-                        .with_inner_size(LogicalSize::new(self.width, self.height))
+                        .with_inner_size(LogicalSize::new(width, height))
                         .with_name("chimp", "chimp"),
                 )
                 .unwrap(),
         );
 
-        // let size = window.inner_size();
-        let surface = SurfaceTexture::new(self.width, self.height, window.clone());
-        let pixels = Pixels::new(self.width, self.height, surface).unwrap();
+        let surface = SurfaceTexture::new(width, height, window.clone());
+        let px = Pixels::new(width, height, surface).unwrap();
 
         self.window = Some(window);
-        self.pixels = Some(pixels);
+        self.pixels = Some(px);
+        self._sink = Some(sink);
+        self._player = Some(player);
+        self.start_time = Some(Instant::now());
+        self.width = width;
+        self.height = height;
+        self.img_pixels = pixels;
+
+        self.window.as_ref().unwrap().request_redraw();
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, _event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
-                println!("1");
-                event_loop.exit();
-                println!("2");
-                return;
+                // User manually closed - clean up this window
+                self.pixels = None;
+                self.window = None;
+                self._sink = None;
+                self._player = None;
+                // Don't exit event loop - just wait for next monker
             }
             WindowEvent::RedrawRequested => {
+                if self.pixels.is_none() {
+                    return;
+                }
+
                 let frame = self.pixels.as_mut().unwrap().frame_mut();
 
-                // Drum roll climax
-                if self.start_time.elapsed() < Duration::from_millis(4_390) {
+                if self.start_time.unwrap().elapsed() < Duration::from_millis(4_390) {
                     frame.fill(0);
                 } else {
                     frame.copy_from_slice(&self.img_pixels);
@@ -78,6 +115,8 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
+
+    fn resumed(&mut self, _: &ActiveEventLoop) {}
 }
 
 const DISPLAY_RATIO: f32 = 0.7;
@@ -115,33 +154,4 @@ fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
     let (width, height) = resized.dimensions();
 
     (img_buffer.as_raw().to_vec(), width, height)
-}
-
-pub fn present(img_filepath: PathBuf) {
-    let (pixels, width, height) = get_normalized_image(img_filepath);
-
-    let sink = DeviceSinkBuilder::open_default_sink().expect("open default audio stream");
-    let player = rodio::play(
-        &sink.mixer(),
-        BufReader::new(File::open("data/Drumroll.mp3").unwrap()),
-    )
-    .unwrap();
-
-    let event_loop = EventLoop::new().unwrap();
-    let mut app = App {
-        window: None,
-        pixels: None,
-
-        _sink: sink,
-        _player: player,
-        start_time: Instant::now(),
-
-        width,
-        height,
-
-        img_pixels: pixels,
-    };
-
-    event_loop.run_app(&mut app).unwrap();
-    println!("3");
 }
