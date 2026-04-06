@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 image = "0.25.10"
+json = "0.12.4"
 pixels = "0.16.0"
 rand = { version = "0.10.0", features = ["std_rng"] }
 rodio = "0.22.2"

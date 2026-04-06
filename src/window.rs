@@ -1,4 +1,5 @@
 use pixels::{Pixels, SurfaceTexture};
+use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
@@ -20,13 +21,18 @@ struct App {
     window: Option<&'static Window>,
     pixels: Option<Pixels<'static>>,
 
-    // sink: MixerDeviceSink,
-    // _player: Player,
+    _sink: MixerDeviceSink,
+    _player: Player,
+
+    start_time: Instant,
+
     width: u32,
     height: u32,
 
     img_pixels: Vec<u8>,
 }
+
+// 4.374280
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -56,11 +62,19 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 let frame = self.pixels.as_mut().unwrap().frame_mut();
 
-                frame.copy_from_slice(&self.img_pixels);
+                // Drum roll climax
+                if self.start_time.elapsed() < Duration::from_millis(4_374) {
+                    frame.fill(0);
+                } else {
+                    frame.copy_from_slice(&self.img_pixels);
+                }
+
                 self.pixels.as_mut().unwrap().render().unwrap();
             }
             _ => {}
         }
+
+        self.window.unwrap().request_redraw();
     }
 }
 
@@ -92,16 +106,12 @@ fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
 
     let (max_w, max_h) = calc_display_size();
 
-    println!("Bounding box: {}x{}", max_w, max_h);
-
     let resized = DynamicImage::resize(&img, max_w, max_h, Lanczos3);
 
     let img_buffer = resized.to_rgba8();
 
     let (width, height) = resized.dimensions();
     let (tmp_w, tmp_h) = img.dimensions();
-
-    println!("ori: {}x{}, new: {}x{}", width, height, tmp_w, tmp_h);
 
     (img_buffer.as_raw().to_vec(), width, height)
 }
@@ -121,8 +131,10 @@ pub fn present(img_filepath: PathBuf) {
         window: None,
         pixels: None,
 
-        sink,
+        _sink: sink,
         _player: player,
+        start_time: Instant::now(),
+
         width,
         height,
 
