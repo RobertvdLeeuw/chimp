@@ -57,7 +57,9 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
+                println!("1");
                 event_loop.exit();
+                println!("2");
                 return;
             }
             WindowEvent::RedrawRequested => {
@@ -141,4 +143,5 @@ pub fn present(img_filepath: PathBuf) {
     };
 
     event_loop.run_app(&mut app).unwrap();
+    println!("3");
 }
