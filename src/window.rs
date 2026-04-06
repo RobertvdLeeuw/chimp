@@ -9,7 +9,7 @@ use winit::window::{Window, WindowAttributes, WindowId};
 use image::imageops::Lanczos3;
 use image::{DynamicImage, GenericImageView, ImageReader, ImageResult};
 
-use swayipc::Connection;
+use swayipc::{Connection, Output};
 
 use rodio::{Device, DeviceSinkBuilder, MixerDeviceSink, Player, source::Source};
 use std::fs::File;
@@ -20,9 +20,8 @@ struct App {
     window: Option<&'static Window>,
     pixels: Option<Pixels<'static>>,
 
-    sink: MixerDeviceSink,
-    _player: Player,
-
+    // sink: MixerDeviceSink,
+    // _player: Player,
     width: u32,
     height: u32,
 
@@ -49,13 +48,6 @@ impl ApplicationHandler for App {
 
         self.window = Some(window);
         self.pixels = Some(pixels);
-
-        self.sink = DeviceSinkBuilder::open_default_sink().expect("open default audio stream");
-        self._player = rodio::play(
-            &self.sink.mixer(),
-            BufReader::new(File::open("data/Drumroll.mp3").unwrap()),
-        )
-        .unwrap();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -77,12 +69,20 @@ fn calc_display_size() -> (u32, u32) {
     let mut conn = Connection::new().expect("Failed to get sway connection.");
     let monitors = conn.get_outputs().unwrap();
 
-    let (w, h) = monitors
+    let cur_mon = monitors
         .iter()
         .filter(|mon| mon.focused)
-        .map(|mon| mon.current_mode.unwrap())
-        .map(|mode| (mode.width as f32, mode.height as f32))
-        .collect::<Vec<(f32, f32)>>()[0];
+        .collect::<Vec<&Output>>()[0];
+
+    let mon_angle: &'static str = cur_mon.transform.clone().unwrap().leak();
+
+    let mode = cur_mon.current_mode.unwrap();
+
+    let (w, h) = match mon_angle {
+        "90" | "270" | "flipped-90" | "flipped-270" => (mode.height as f32, mode.width as f32),
+        "normal" | "180" | "flipped-180" => (mode.width as f32, mode.height as f32),
+        _ => panic!("Unsupported monitor rotation: {}", mon_angle),
+    };
 
     ((w * DISPLAY_RATIO) as u32, (h * DISPLAY_RATIO) as u32)
 }
@@ -92,11 +92,16 @@ fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
 
     let (max_w, max_h) = calc_display_size();
 
+    println!("Bounding box: {}x{}", max_w, max_h);
+
     let resized = DynamicImage::resize(&img, max_w, max_h, Lanczos3);
 
     let img_buffer = resized.to_rgba8();
 
     let (width, height) = resized.dimensions();
+    let (tmp_w, tmp_h) = img.dimensions();
+
+    println!("ori: {}x{}, new: {}x{}", width, height, tmp_w, tmp_h);
 
     (img_buffer.as_raw().to_vec(), width, height)
 }
@@ -104,21 +109,25 @@ fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
 pub fn present(img_filepath: PathBuf) {
     let (pixels, width, height) = get_normalized_image(img_filepath);
 
+    let sink = DeviceSinkBuilder::open_default_sink().expect("open default audio stream");
+    let player = rodio::play(
+        &sink.mixer(),
+        BufReader::new(File::open("data/Drumroll.mp3").unwrap()),
+    )
+    .unwrap();
+
     let event_loop = EventLoop::new().unwrap();
     let mut app = App {
         window: None,
         pixels: None,
 
-        sink: None,
-        _player: None,
-
+        sink,
+        _player: player,
         width,
         height,
 
         img_pixels: pixels,
     };
 
-    println!("Starting app");
     event_loop.run_app(&mut app).unwrap();
-    println!("Closed app");
 }
