@@ -11,11 +11,17 @@ use image::{DynamicImage, GenericImageView, ImageReader, ImageResult};
 
 use swayipc::Connection;
 
+use rodio::{Device, DeviceSinkBuilder, MixerDeviceSink, Player, source::Source};
+use std::fs::File;
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 struct App {
     window: Option<&'static Window>,
     pixels: Option<Pixels<'static>>,
+
+    sink: MixerDeviceSink,
+    _player: Player,
 
     width: u32,
     height: u32,
@@ -43,6 +49,13 @@ impl ApplicationHandler for App {
 
         self.window = Some(window);
         self.pixels = Some(pixels);
+
+        self.sink = DeviceSinkBuilder::open_default_sink().expect("open default audio stream");
+        self._player = rodio::play(
+            &self.sink.mixer(),
+            BufReader::new(File::open("data/Drumroll.mp3").unwrap()),
+        )
+        .unwrap();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -95,6 +108,9 @@ pub fn present(img_filepath: PathBuf) {
     let mut app = App {
         window: None,
         pixels: None,
+
+        sink: None,
+        _player: None,
 
         width,
         height,

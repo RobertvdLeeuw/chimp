@@ -26,6 +26,7 @@
           buildInputs = with pkgs; [
             wayland
             libxkbcommon
+            alsa-lib
             xkeyboard-config
           ];
 
@@ -37,6 +38,7 @@
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
             pkgs.libGL
             pkgs.libxkbcommon
+            pkgs.alsa-lib
             pkgs.wayland
           ];
         };
@@ -45,6 +47,7 @@
           buildInputs = with pkgs; [
             wayland
             libxkbcommon
+            alsa-lib
             xkeyboard-config # Add this
             libGL
           ];
@@ -54,6 +57,7 @@
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
             pkgs.libGL
             pkgs.libxkbcommon
+            pkgs.alsa-lib
             pkgs.wayland
           ];
           XKB_CONFIG_ROOT = "${pkgs.xkeyboard-config}/share/X11/xkb";
