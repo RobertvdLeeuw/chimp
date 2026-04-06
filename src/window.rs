@@ -54,6 +54,7 @@ impl ApplicationHandler<PathBuf> for App {
 
         let mut sink = DeviceSinkBuilder::open_default_sink().unwrap();
         sink.log_on_drop(false);
+
         let player = rodio::play(
             sink.mixer(),
             BufReader::new(File::open("data/Drumroll.mp3").unwrap()),

@@ -49,7 +49,6 @@ impl State {
 
 const MONKER_DIR: &str = "./data/monkers";
 
-// NOTE: When should I use &Path vs PathBuf?
 fn pick_monker(state: &mut State) -> PathBuf {
     let files: Vec<PathBuf> = match fs::read_dir(Path::new(MONKER_DIR)) {
         Ok(rd) => rd
@@ -76,14 +75,12 @@ fn pick_time() -> u32 {
     // picking secs + countdown instead of random future time prevents planned time when PC off.
     // Now on PC reboot, it can just continue the countdown.
 
-    // return rand::rng().random_range(8 * 3600..16 * 3600);
-    return 30;
+    rand::rng().random_range(8 * 3600..16 * 3600)
 }
 
 fn main() {
     let mut state = State::load_or_default();
 
-    // let (tx, rx) = mpsc::channel();
     let event_loop = EventLoop::with_user_event().build().unwrap();
     let proxy = event_loop.create_proxy();
 
