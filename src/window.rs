@@ -3,19 +3,19 @@ use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::platform::wayland::WindowAttributesExtWayland;
 use winit::window::{Window, WindowAttributes, WindowId};
 
 use image::imageops::Lanczos3;
-use image::{DynamicImage, GenericImageView, ImageReader, ImageResult};
+use image::{DynamicImage, GenericImageView, ImageReader};
 
 use swayipc::{Connection, Output};
 
-use rodio::{Device, DeviceSinkBuilder, MixerDeviceSink, Player, source::Source};
+use rodio::{DeviceSinkBuilder, MixerDeviceSink, Player};
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 struct App {

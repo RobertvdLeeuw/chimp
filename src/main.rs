@@ -1,9 +1,7 @@
-use image::flat::Error;
 use rand::RngExt;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
 
