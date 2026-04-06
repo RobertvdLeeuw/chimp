@@ -72,7 +72,7 @@ fn pick_monker(state: &mut State) -> PathBuf {
 }
 
 fn pick_time() -> u32 {
-    // picking secs + countdown instead of random future time prevents planned time when PC off.
+    // Picking secs + countdown instead of random future time prevents planned time when PC off.
     // Now on PC reboot, it can just continue the countdown.
 
     rand::rng().random_range(8 * 3600..16 * 3600)
@@ -84,13 +84,22 @@ fn main() {
     let event_loop = EventLoop::with_user_event().build().unwrap();
     let proxy = event_loop.create_proxy();
 
+    let wait_interval_s = 5;
+
     // Countdown thread - manages state and timing
     thread::spawn(move || {
+        let mut save_loop_tracker = 0;
         loop {
-            thread::sleep(Duration::from_secs(1));
+            thread::sleep(Duration::from_secs(wait_interval_s));
 
-            state.time_left_s -= 1;
-            state.save();
+            state.time_left_s -= wait_interval_s as u32;
+
+            // Save every min.
+            save_loop_tracker += 1;
+            if save_loop_tracker == 12 {
+                state.save();
+                save_loop_tracker = 0;
+            }
 
             if state.time_left_s == 0 {
                 let monker_path = pick_monker(&mut state);

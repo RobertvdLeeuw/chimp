@@ -10,7 +10,7 @@ use winit::window::{Window, WindowAttributes, WindowId};
 use image::imageops::Lanczos3;
 use image::{DynamicImage, GenericImageView, ImageReader};
 
-use swayipc::{Connection, Output};
+use swayipc::Connection;
 
 use rodio::{DeviceSinkBuilder, MixerDeviceSink, Player};
 use std::fs::File;
@@ -106,12 +106,13 @@ impl ApplicationHandler<PathBuf> for App {
 
                 if self.start_time.unwrap().elapsed() < Duration::from_millis(4_390) {
                     frame.fill(0);
+                    self.window.as_ref().unwrap().request_redraw();
                 } else {
                     frame.copy_from_slice(&self.img_pixels);
+                    // No redraws necessary anymore.
                 }
 
                 self.pixels.as_mut().unwrap().render().unwrap();
-                self.window.as_ref().unwrap().request_redraw();
             }
             _ => {}
         }
@@ -123,17 +124,13 @@ impl ApplicationHandler<PathBuf> for App {
 const DISPLAY_RATIO: f32 = 0.7;
 fn calc_display_size() -> (u32, u32) {
     let mut conn = Connection::new().expect("Failed to get sway connection.");
-    let monitors = conn.get_outputs().unwrap();
+    let monitors = conn.get_outputs().expect("No monitors found.");
 
-    let cur_mon = monitors
-        .iter()
-        .filter(|mon| mon.focused)
-        .collect::<Vec<&Output>>()[0];
-
-    let mon_angle: &'static str = cur_mon.transform.clone().unwrap().leak();
+    let cur_mon = monitors.iter().find(|mon| mon.focused).unwrap();
 
     let mode = cur_mon.current_mode.unwrap();
 
+    let mon_angle = cur_mon.transform.as_deref().unwrap_or("normal");
     let (w, h) = match mon_angle {
         "90" | "270" | "flipped-90" | "flipped-270" => (mode.height as f32, mode.width as f32),
         "normal" | "180" | "flipped-180" => (mode.width as f32, mode.height as f32),
