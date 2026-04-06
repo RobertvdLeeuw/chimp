@@ -32,8 +32,6 @@ struct App {
     img_pixels: Vec<u8>,
 }
 
-// 4.374280
-
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Leak the Window so it has 'static lifetime
@@ -63,7 +61,7 @@ impl ApplicationHandler for App {
                 let frame = self.pixels.as_mut().unwrap().frame_mut();
 
                 // Drum roll climax
-                if self.start_time.elapsed() < Duration::from_millis(4_374) {
+                if self.start_time.elapsed() < Duration::from_millis(4_385) {
                     frame.fill(0);
                 } else {
                     frame.copy_from_slice(&self.img_pixels);
@@ -111,7 +109,6 @@ fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
     let img_buffer = resized.to_rgba8();
 
     let (width, height) = resized.dimensions();
-    let (tmp_w, tmp_h) = img.dimensions();
 
     (img_buffer.as_raw().to_vec(), width, height)
 }

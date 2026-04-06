@@ -1,3 +1,4 @@
+use image::flat::Error;
 use rand::RngExt;
 
 use std::fs;
@@ -6,24 +7,51 @@ use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+use serde_json;
+
 mod window;
 
-// TODO:
-// Collect monkey pics
-// Pick random time
-// Wait until time elapsed (countdown, solves "accidentally planned when PC off")
-// Store time left in file
-// On time:
-//  Open window - black screen
-//   Floating window (sway)
-//    Pick random screen place
-//  Fade in monkey pic
-//  Drumroll
+#[derive(Serialize, Deserialize)]
+struct State {
+    secs_left: u32,
+    monkers_last_picked: Vec<PathBuf>,
+}
 
-const MONKER_DIR: &str = "./monkers";
+impl State {
+    fn save(&self) {
+        fs::write("./data/state.json", serde_json::to_string(self).unwrap()).unwrap()
+    }
+
+    fn new() -> Self {
+        State {
+            secs_left: pick_time(),
+            monkers_last_picked: Vec::new(),
+        }
+    }
+
+    // That sounds mean.
+    fn push_monkey(&mut self, filepath: PathBuf) {
+        self.monkers_last_picked.insert(0, filepath);
+        self.monkers_last_picked.truncate(3);
+        self.save()
+    }
+
+    fn load() -> Result<Self, std::io::Error> {
+        let contents = fs::read_to_string("./data/state.json")?;
+
+        Ok(serde_json::from_str(&contents)?)
+    }
+
+    fn load_or_default() -> Self {
+        Self::load().unwrap_or_else(|_| Self::new())
+    }
+}
+
+const MONKER_DIR: &str = "./data/monkers";
 
 // NOTE: When should I use &Path vs PathBuf?
-fn pick_monker() -> PathBuf {
+fn pick_monker(state: &mut State) -> PathBuf {
     let files: Vec<PathBuf> = match fs::read_dir(Path::new(MONKER_DIR)) {
         Ok(rd) => rd
             .filter_map(|res| res.ok())
@@ -32,58 +60,49 @@ fn pick_monker() -> PathBuf {
         Err(e) => panic!("Error when reading monkey dir: {}", e),
     };
 
-    let index = rand::rng().random_range(0..files.len());
+    loop {
+        let index = rand::rng().random_range(0..files.len());
 
-    // TODO: Store last picked, make sure not twice in a row.
+        let picked = files[index].clone();
 
-    files[index].clone()
+        if !state.monkers_last_picked.contains(&picked) {
+            state.push_monkey(picked.clone());
+
+            println!("New: {}", picked.display());
+            return picked;
+        }
+        println!("Recent: {}", picked.display())
+    }
 }
 
-fn update_time(sec_left: &mut u32, wait_s: u64) {
-    *sec_left -= wait_s as u32;
-
-    // Save time to file
-    match fs::write("./data/time_left.txt", sec_left.to_string()) {
-        Ok(_) => {}
-        Err(e) => panic!("Error saving timing file: {error}", error = e),
-    };
-}
-
-fn pick_time(start: bool) -> u32 {
+fn pick_time() -> u32 {
     // picking secs + countdown instead of random future time prevents planned time when PC off.
     // Now on PC reboot, it can just continue the countdown.
-    if !start {
-        // return rand::rng().random_range(8 * 3600..16 * 3600);
-        return 3;
-    }
 
-    // NOTE: How can I avoid such nesting? I miss guard clauses.
-    match fs::read_to_string("./data/time_left.txt") {
-        Ok(val) => {
-            match val.parse::<u32>() {
-                Ok(num) => return num,
-                Err(_) => panic!("Timing file value not a number: {}", val),
-            };
-        }
-        Err(_) => pick_time(false), // Just get new time.
-    }
+    // return rand::rng().random_range(8 * 3600..16 * 3600);
+    return 30;
 }
 
 fn main() {
-    let mut sec_left: u32 = pick_time(true);
+    let mut state = State::load_or_default();
 
-    let wait_s = 1;
+    let wait_interval_s = 1;
 
-    window::present(pick_monker());
+    // window::present(pick_monker());
+    // exit(0);
 
-    exit(0);
     loop {
-        if sec_left == 0 {
-            window::present(pick_monker());
-            sec_left = pick_time(false)
+        if state.secs_left == 0 {
+            window::present(pick_monker(&mut state));
+            println!("Present: {}", pick_monker(&mut state).display());
+
+            state.secs_left = pick_time();
+            state.save();
         }
 
-        update_time(&mut sec_left, wait_s);
-        sleep(Duration::new(wait_s, 0));
+        state.secs_left -= wait_interval_s as u32;
+        state.save();
+
+        sleep(Duration::new(wait_interval_s, 0));
     }
 }
