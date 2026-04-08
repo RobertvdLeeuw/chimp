@@ -52,14 +52,18 @@ impl ApplicationHandler<PathBuf> for App {
         // Create window for new monker display
         let (pixels, width, height) = get_normalized_image(monker_path.clone());
 
-        let mut sink = DeviceSinkBuilder::open_default_sink().unwrap();
+        let mut sink = DeviceSinkBuilder::open_default_sink()
+            .expect("Failed to open audio device - check audio permissions");
         sink.log_on_drop(false);
 
         let player = rodio::play(
             sink.mixer(),
-            BufReader::new(File::open("data/Drumroll.mp3").unwrap()),
+            BufReader::new(
+                File::open("data/Drumroll.mp3")
+                    .expect("Failed to open data/Drumroll.mp3 - file missing?"),
+            ),
         )
-        .unwrap();
+        .expect("Failed to start audio playback");
 
         let window = Arc::new(
             event_loop
@@ -69,11 +73,12 @@ impl ApplicationHandler<PathBuf> for App {
                         .with_inner_size(LogicalSize::new(width, height))
                         .with_name("chimp", "chimp"),
                 )
-                .unwrap(),
+                .expect("Failed to create window - check Wayland connection"),
         );
 
         let surface = SurfaceTexture::new(width, height, window.clone());
-        let px = Pixels::new(width, height, surface).unwrap();
+        let px =
+            Pixels::new(width, height, surface).expect("Failed to initialize GPU pixel buffer");
 
         self.window = Some(window);
         self.pixels = Some(px);
@@ -112,7 +117,11 @@ impl ApplicationHandler<PathBuf> for App {
                     // No redraws necessary anymore.
                 }
 
-                self.pixels.as_mut().unwrap().render().unwrap();
+                self.pixels
+                    .as_mut()
+                    .unwrap()
+                    .render()
+                    .expect("Failed to render frame to GPU");
             }
             _ => {}
         }
@@ -123,12 +132,18 @@ impl ApplicationHandler<PathBuf> for App {
 
 const DISPLAY_RATIO: f32 = 0.7;
 fn calc_display_size() -> (u32, u32) {
-    let mut conn = Connection::new().expect("Failed to get sway connection.");
-    let monitors = conn.get_outputs().expect("No monitors found.");
+    let mut conn =
+        Connection::new().expect("Failed to connect to Sway IPC - are you running Sway?");
+    let monitors = conn.get_outputs().expect("Failed to query Sway outputs");
 
-    let cur_mon = monitors.iter().find(|mon| mon.focused).unwrap();
+    let cur_mon = monitors
+        .iter()
+        .find(|mon| mon.focused)
+        .expect("Failed to find focused monitor.");
 
-    let mode = cur_mon.current_mode.unwrap();
+    let mode = cur_mon
+        .current_mode
+        .expect("Failed to retrieve monitor mode.");
 
     let mon_angle = cur_mon.transform.as_deref().unwrap_or("normal");
     let (w, h) = match mon_angle {
@@ -141,7 +156,10 @@ fn calc_display_size() -> (u32, u32) {
 }
 
 fn get_normalized_image(img_filepath: PathBuf) -> (Vec<u8>, u32, u32) {
-    let img = ImageReader::open(img_filepath).unwrap().decode().unwrap();
+    let img = ImageReader::open(img_filepath)
+        .expect("Failed to open image")
+        .decode()
+        .expect("Failed to decode image - corrupt file?");
 
     let (max_w, max_h) = calc_display_size();
 

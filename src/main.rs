@@ -19,7 +19,11 @@ struct State {
 
 impl State {
     fn save(&self) {
-        fs::write("./data/state.json", serde_json::to_string(self).unwrap()).unwrap()
+        fs::write(
+            "./data/state.json",
+            serde_json::to_string(self).expect("Failed to serialize state to JSON"),
+        )
+        .expect("Failed to write state.json - check disk space and permissions")
     }
 
     fn new() -> Self {
@@ -50,13 +54,11 @@ impl State {
 const MONKER_DIR: &str = "./data/monkers";
 
 fn pick_monker(state: &mut State) -> PathBuf {
-    let files: Vec<PathBuf> = match fs::read_dir(Path::new(MONKER_DIR)) {
-        Ok(rd) => rd
-            .filter_map(|res| res.ok())
-            .map(|entry| entry.path())
-            .collect(),
-        Err(e) => panic!("Error when reading monkey dir: {}", e),
-    };
+    let files: Vec<PathBuf> = fs::read_dir(Path::new(MONKER_DIR))
+        .expect("Failed to open monkers directory - does ./data/monkers exist?")
+        .filter_map(|res| res.ok())
+        .map(|entry| entry.path())
+        .collect();
 
     loop {
         let index = rand::rng().random_range(0..files.len());
@@ -81,7 +83,9 @@ fn pick_time() -> u32 {
 fn main() {
     let mut state = State::load_or_default();
 
-    let event_loop = EventLoop::with_user_event().build().unwrap();
+    let event_loop = EventLoop::with_user_event()
+        .build()
+        .expect("Failed to create winit event loop");
     let proxy = event_loop.create_proxy();
 
     let wait_interval_s = 5;
@@ -103,7 +107,9 @@ fn main() {
 
             if state.time_left_s == 0 {
                 let monker_path = pick_monker(&mut state);
-                proxy.send_event(monker_path).unwrap();
+                proxy
+                    .send_event(monker_path)
+                    .expect("UI thread died - can't send monker event");
 
                 state.time_left_s = pick_time();
                 state.save();
@@ -112,5 +118,5 @@ fn main() {
     });
 
     let mut app = window::App::new();
-    event_loop.run_app(&mut app).unwrap();
+    event_loop.run_app(&mut app).expect("Event loop crashed");
 }
